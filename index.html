@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RC Location Map / ផែនទីទីតាំង RC</title>
+
+<!-- PWA install support -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1b5e20">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RC Mapper">
+
+<!-- ====================================================================
+     SETUP: fill in these three values before deploying
+     ==================================================================== -->
+<script>
+  const GOOGLE_CLIENT_ID = "139380412075-23i2nbbp93ptgo01s7skq8bmc9d702to.apps.googleusercontent.com";
+  const GOOGLE_MAPS_API_KEY = "AIzaSyDIAZFEeStSgikgb9OYmLSCmmmUP7gz7ng";
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwK2JRLVcF_M30u5QdlVjNUZlw2ecPPYrOr64d0dk5LEVtKPJu8fOdoJwIqEbVMc0IQ9w/exec";
+</script>
+<!-- ==================================================================== -->
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Khmer OS', 'Noto Sans Khmer', Arial, sans-serif;
+    background: #f4f6f5;
+    color: #1f2d24;
+  }
+  #loginScreen {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 20px;
+    text-align: center;
+  }
+  #loginLogo {
+    width: 96px;
+    height: 96px;
+    border-radius: 22px;
+    box-shadow: 0 6px 18px rgba(27,94,32,0.35);
+    margin-bottom: 4px;
+  }
+  #loginScreen h1 { color: #1b5e20; margin-bottom: 4px; }
+  #loginScreen p { color: #4a5c50; max-width: 340px; }
+  #loginDivider {
+    display: flex;
+    align-items: center;
+    width: 260px;
+    max-width: 80vw;
+    color: #999;
+    font-size: 12px;
+    margin: 6px 0;
+  }
+  #loginDivider::before, #loginDivider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #ddd;
+  }
+  #loginDivider span { padding: 0 10px; }
+  #pinLoginBox {
+    width: 280px;
+    max-width: 85vw;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 14px 16px 16px;
+    text-align: left;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  #pinLoginBox label { display: block; font-size: 12px; color: #444; margin-top: 8px; }
+  #pinLoginBox select, #pinLoginBox input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    margin-top: 3px;
+  }
+  #pinLoginBox button {
+    width: 100%;
+    margin-top: 12px;
+    background: #1b5e20;
+    color: white;
+    border: none;
+    padding: 9px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  #pinLoginBox button:hover { background: #256428; }
+  #errorBox {
+    color: #b3261e;
+    background: #fdecea;
+    border: 1px solid #f5c2c0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    display: none;
+    max-width: 340px;
+  }
+  #appScreen { display: none; height: 100vh; flex-direction: column; position: relative; }
+  #topBar {
+    background: #1b5e20;
+    color: white;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    z-index: 10;
+  }
+  #topBar .userInfo { font-size: 13px; }
+  #topBar button {
+    background: #2e7d32;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  #topBar button:hover { background: #256428; }
+  #topBar button.secondary { background: #6d6d6d; }
+  #topBar button.secondary:hover { background: #555; }
+  #topBar button.adminBtn { background: #8e24aa; }
+  #topBar button.adminBtn:hover { background: #6a1b7a; }
+  #rcSearchBox { position: relative; flex: 1; min-width: 220px; max-width: 360px; }
+  #rcSearchBox input {
+    width: 100%;
+    padding: 7px 10px;
+    border-radius: 6px;
+    border: none;
+    font-size: 14px;
+  }
+  #rcSearchResults {
+    display: none;
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: white;
+    border-radius: 8px;
+    margin-top: 4px;
+    max-height: 280px;
+    overflow-y: auto;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    z-index: 40;
+  }
+  #rcSearchResults .rcResultItem {
+    padding: 9px 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    color: #1f2d24;
+    font-size: 13px;
+  }
+  #rcSearchResults .rcResultItem:last-child { border-bottom: none; }
+  #rcSearchResults .rcResultItem:hover, #rcSearchResults .rcResultItem.active { background: #f4f6f5; }
+  #rcSearchResults .rcResultItem .rcName { font-weight: bold; }
+  #rcSearchResults .rcResultItem .rcMeta { font-size: 11px; color: #666; margin-top: 2px; }
+  #rcSearchResults .rcStatus { float: right; font-size: 11px; padding: 2px 7px; border-radius: 10px; }
+  #rcSearchResults .rcStatus.pinned { background: #e8f5e9; color: #1b5e20; }
+  #rcSearchResults .rcStatus.unpinned { background: #fff3cd; color: #664d03; }
+  #rcSearchResults .rcNoResults { padding: 12px; font-size: 13px; color: #888; text-align: center; }
+  #searchBox { display: flex; gap: 6px; flex: 1; min-width: 200px; max-width: 340px; position: relative; }
+  #searchBox input {
+    flex: 1;
+    padding: 7px 10px;
+    border-radius: 6px;
+    border: none;
+    font-size: 14px;
+    min-width: 0;
+  }
+  #searchBox button {
+    background: #f9a825;
+    color: #1f2d24;
+    border: none;
+    padding: 7px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  #searchBox button:hover { background: #f0ca67; }
+  #topBtnGroup { display: flex; gap: 6px; flex-wrap: wrap; }
+  #geocodeStatus {
+    display: none;
+    position: fixed;
+    bottom: 12px; left: 12px; right: 12px;
+    text-align: center;
+    background: #0d47a1;
+    color: white;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 30;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+  #map { flex: 1; width: 100%; }
+
+  /* Shared floating panel style */
+  .floatPanel {
+    display: none;
+    position: fixed;
+    top: 52px; right: 10px;
+    width: 320px;
+    max-width: calc(100vw - 20px);
+    background: white;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    border-radius: 10px;
+    z-index: 25;
+    max-height: 78vh;
+    overflow-y: auto;
+  }
+  .floatPanel .panelHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    color: white;
+    border-radius: 10px 10px 0 0;
+    position: sticky;
+    top: 0;
+  }
+  #villageCenterPanel .panelHeader { background: #8e24aa; }
+  #pinPanel .panelHeader { background: #1b5e20; }
+  .floatPanel .panelHeader button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+  }
+  .floatPanel .panelBody { padding: 12px 14px 16px; }
+  .floatPanel label { display: block; margin-top: 10px; font-size: 12px; color: #444; }
+  .floatPanel input, .floatPanel textarea, .floatPanel select {
+    width: 100%;
+    padding: 7px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-top: 3px;
+  }
+  .floatPanel .readonlyField {
+    padding: 7px;
+    background: #f4f6f5;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-top: 3px;
+    color: #333;
+  }
+  .floatPanel .hint {
+    margin-top: 10px;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    display: none;
+  }
+  .floatPanel .hint.warn { background: #fff3cd; color: #664d03; }
+  .floatPanel .hint.ok { background: #e8f5e9; color: #1b5e20; }
+  .floatPanel .rowBtns { display: flex; gap: 8px; margin-top: 14px; }
+  .floatPanel .rowBtns button {
+    flex: 1;
+    padding: 9px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btnPrimary { background: #1b5e20; color: white; }
+  .btnPrimaryPurple { background: #8e24aa; color: white; }
+  .btnCancel { background: #eee; color: #333; }
+  .infoWindowContent { font-size: 14px; }
+  .infoWindowContent .dirBtn {
+    display: inline-block;
+    margin-top: 6px;
+    background: #1b5e20;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    text-decoration: none;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .infoWindowContent .dirBtn:hover { background: #256428; }
+  .infoWindowContent .deletePinBtn {
+    display: block;
+    margin-top: 8px;
+    background: #b3261e;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .infoWindowContent .deletePinBtn:hover { background: #8f1e18; }
+  .rcMarkerLabel {
+    position: absolute;
+    transform: translate(-50%, 4px);
+    background: white;
+    color: #1f2d24;
+    font-size: 11px;
+    line-height: 1.3;
+    padding: 3px 7px;
+    border-radius: 6px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+    white-space: nowrap;
+    pointer-events: none;
+    border: 1px solid rgba(0,0,0,0.08);
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rcMarkerLabel .rcLabelId { font-weight: 700; color: #1b5e20; }
+  #loadingOverlay {
+    position: fixed; inset: 0;
+    background: rgba(255,255,255,0.85);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: #1b5e20; z-index: 50;
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <img src="icon-192.png" alt="RC Location Map" id="loginLogo">
+  <h1>RC Location Map</h1>
+  <p>ផែនទីទីតាំង RC — សម្រាប់បុគ្គលិកនិង CVC ដែលមានសិទ្ធិចូលប្រើប៉ុណ្ណោះ<br>
+  <span style="font-size:13px;">For authorized World Vision staff and CVC only.</span></p>
+  <div id="errorBox"></div>
+  <div id="googleSignInBtn"></div>
+
+  <div id="loginDivider"><span>OR</span></div>
+
+  <div id="pinLoginBox">
+    <label for="pinLoginSelect">CVC Name / ឈ្មោះ CVC</label>
+    <select id="pinLoginSelect">
+      <option value="">-- Loading list... --</option>
+    </select>
+    <label for="pinLoginPin">PIN</label>
+    <input type="password" inputmode="numeric" id="pinLoginPin" placeholder="Enter your PIN" autocomplete="off">
+    <button id="pinLoginBtn">Sign In / ចូល</button>
+  </div>
+</div>
+
+<!-- MAIN APP SCREEN -->
+<div id="appScreen">
+
+  <div id="topBar">
+    <div class="userInfo" id="userInfo"></div>
+    <div id="rcSearchBox">
+      <input type="text" id="rcSearchInput" placeholder="🔍 Search RC: name or last 4-digit ID / ស្វែងរក RC" autocomplete="off">
+      <div id="rcSearchResults"></div>
+    </div>
+    <div id="searchBox">
+      <input type="text" id="villageSearchInput" list="villageDatalist" placeholder="Search village name... / ស្វែងរកភូមិ">
+      <datalist id="villageDatalist"></datalist>
+      <button id="goToVillageBtn">📍 Go</button>
+    </div>
+    <div id="topBtnGroup">
+      <button id="togglePinModeBtn">➕ Pin RC</button>
+      <button class="adminBtn" id="toggleVillageCenterBtn" style="display:none;">📌 Set Village Center</button>
+      <button class="secondary" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+  <div id="geocodeStatus"></div>
+  <div id="map"></div>
+</div>
+
+<!-- ADMIN ONLY: pick District/Commune/Village, tap map to save its center point -->
+<div id="villageCenterPanel" class="floatPanel">
+  <div class="panelHeader">
+    <strong>Set Village Center / កំណត់ចំណុចកណ្តាលភូមិ</strong>
+    <button id="closeVillageCenterBtn">✕</button>
+  </div>
+  <div class="panelBody">
+    <label>District / ស្រុក</label>
+    <select id="vcDistrict"><option value="">-- Select District --</option></select>
+
+    <label>Commune / ឃុំ</label>
+    <select id="vcCommune" disabled><option value="">-- Select District first --</option></select>
+
+    <label>Village / ភូមិ</label>
+    <select id="vcVillage" disabled><option value="">-- Select Commune first --</option></select>
+
+    <div class="hint warn" id="vcTapHint">📍 Tap the map at this village's central point (e.g. the school, pagoda, or market).</div>
+    <div class="hint ok" id="vcSetHint">✅ Center point set. Tap again to adjust, or Save.</div>
+
+    <div class="rowBtns">
+      <button class="btnCancel" id="vcCancelBtn">Cancel</button>
+      <button class="btnPrimaryPurple" id="vcSaveBtn">Save Center</button>
+    </div>
+  </div>
+</div>
+
+<!-- Household pin details, shown after tapping the map near a searched village -->
+<div id="pinPanel" class="floatPanel">
+  <div class="panelHeader">
+    <strong>Complete RC Details / បំពេញព័ត៌មាន</strong>
+    <button id="closePinPanelBtn">✕</button>
+  </div>
+  <div class="panelBody">
+    <label>Village / ភូមិ</label>
+    <div class="readonlyField" id="pinVillageDisplay"></div>
+
+    <label>Child ID & Name / លេខសម្គាល់ និងឈ្មោះកុមារ</label>
+    <input type="text" id="pinChildSearchInput" list="pinChildDatalist" placeholder="🔍 Type name or ID to search..." autocomplete="off">
+    <datalist id="pinChildDatalist"></datalist>
+
+    <label>Notes (optional) / កំណត់ចំណាំ</label>
+    <textarea id="pinNotes" rows="2" placeholder="e.g. house behind the pagoda"></textarea>
+
+    <div class="rowBtns">
+      <button class="btnCancel" id="cancelPinBtn">Cancel</button>
+      <button class="btnPrimary" id="savePinBtn">Save Pin</button>
+    </div>
+  </div>
+</div>
+
+<div id="loadingOverlay" style="display:none;">Loading...</div>
+
+<script>
+let map, currentUser, authCreds = {}, tempMarker, pinMode = false, villageCenterMode = false;
+let markers = [];
+let markersByChildId = {};
+let roster = []; // { childId, name, district, commune, village }
+let villageCenters = []; // { district, commune, village, lat, lng }
+let villageCentersByKey = {}; // "district|commune|village" -> center
+let villageDisplayToKey = {}; // "Village - Commune - District" -> "district|commune|village"
+let selectedVillageForPin = null; // { district, commune, village }
+let preSelectedChildId = null; // set when a specific child was chosen via the RC search box
+let pinChildDisplayToChild = {}; // "ChildID - Name" -> { childId, name } for the current village's pin panel
+let RcLabelOverlay; // custom overlay class for always-visible ID/name label, defined once google.maps is ready
+
+// ---------- Login setup: Google Sign-In + Name/PIN (for CVC without email) ----------
+window.onload = function() {
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleCredentialResponse
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('googleSignInBtn'),
+    { theme: 'filled_blue', size: 'large', text: 'signin_with' }
+  );
+  loadPinLoginOptions();
+};
+
+// Populate the CVC name dropdown for Name+PIN login by asking the backend
+// for the list of { loginCode, name } pairs (no credentials needed for this).
+function loadPinLoginOptions() {
+  const select = document.getElementById('pinLoginSelect');
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'getLoginOptions' })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.ok || !data.options || !data.options.length) {
+      select.innerHTML = '<option value="">-- No CVC PIN accounts set up --</option>';
+      return;
+    }
+    select.innerHTML = '<option value="">-- Select your name --</option>' +
+      data.options
+        .slice()
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+        .map(o => `<option value="${escapeHtml(o.loginCode)}">${escapeHtml(o.name)}</option>`)
+        .join('');
+  })
+  .catch(() => {
+    select.innerHTML = '<option value="">-- Could not load list, try Google sign-in --</option>';
+  });
+}
+
+document.getElementById('pinLoginBtn').addEventListener('click', handlePinLogin);
+document.getElementById('pinLoginPin').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') handlePinLogin();
+});
+
+function handlePinLogin() {
+  const loginCode = document.getElementById('pinLoginSelect').value;
+  const pin = document.getElementById('pinLoginPin').value.trim();
+  if (!loginCode) { showError('Please select your name first. / សូមជ្រើសរើសឈ្មោះរបស់អ្នកជាមុន'); return; }
+  if (!pin) { showError('Please enter your PIN. / សូមបញ្ចូលលេខ PIN របស់អ្នក'); return; }
+  performLogin({ loginCode: loginCode, pin: pin });
+}
+
+function handleCredentialResponse(response) {
+  performLogin({ idToken: response.credential });
+}
+
+// Shared by both login methods: sends the credentials to the backend, and on
+// success stores them in authCreds so every later request (add/delete pin,
+// set village center) is authenticated the same way the user logged in.
+function performLogin(creds) {
+  showLoading(true);
+  document.getElementById('errorBox').style.display = 'none';
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action: 'login' }, creds))
+  })
+  .then(r => r.json())
+  .then(data => {
+    showLoading(false);
+    if (!data.ok) {
+      showError(data.error || 'Login failed.');
+      return;
+    }
+    authCreds = creds;
+    currentUser = data.user;
+    roster = data.roster || [];
+    villageCenters = data.villageCenters || [];
+    buildVillageLookups();
+
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'flex';
+    document.getElementById('userInfo').textContent =
+      currentUser.name + ' (' + currentUser.role + ')';
+
+    if (String(currentUser.role).toLowerCase() === 'admin') {
+      document.getElementById('toggleVillageCenterBtn').style.display = 'inline-block';
+      populateVCDistrictDropdown();
+    }
+
+    initMapAndLoadMarkers(data.locations);
+  })
+  .catch(err => {
+    showLoading(false);
+    showError('Network error contacting server. ' + err.message);
+  });
+}
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  box.textContent = msg;
+  box.style.display = 'block';
+}
+function showLoading(on) {
+  document.getElementById('loadingOverlay').style.display = on ? 'flex' : 'none';
+}
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, s => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[s]));
+}
+function uniqueSorted(arr) {
+  return [...new Set(arr.filter(Boolean))].sort();
+}
+function vKey(d, c, v) { return d + '|' + c + '|' + v; }
+
+function buildVillageLookups() {
+  villageCentersByKey = {};
+  villageDisplayToKey = {};
+  const datalist = document.getElementById('villageDatalist');
+  let options = '';
+  villageCenters.forEach(vc => {
+    const key = vKey(vc.district, vc.commune, vc.village);
+    villageCentersByKey[key] = vc;
+    const display = vc.village + ' - ' + vc.commune + ' - ' + vc.district;
+    villageDisplayToKey[display] = key;
+    options += `<option value="${escapeHtml(display)}">`;
+  });
+  datalist.innerHTML = options;
+}
+
+// ---------- Google Maps ----------
+function loadGoogleMapsScript() {
+  const script = document.createElement('script');
+  script.src = 'https://maps.googleapis.com/maps/api/js?key=' + GOOGLE_MAPS_API_KEY;
+  document.head.appendChild(script);
+}
+loadGoogleMapsScript();
+
+function initMapAndLoadMarkers(locations) {
+  const center = locations.length
+    ? { lat: parseFloat(locations[0].lat), lng: parseFloat(locations[0].lng) }
+    : { lat: 11.5564, lng: 104.9282 };
+
+  function setup() {
+    if (!window.google || !google.maps) { setTimeout(setup, 200); return; }
+
+    if (!RcLabelOverlay) {
+      RcLabelOverlay = class extends google.maps.OverlayView {
+        constructor(position, html, gmap) {
+          super();
+          this.position = position;
+          this.html = html;
+          this.div = null;
+          this.setMap(gmap);
+        }
+        onAdd() {
+          const div = document.createElement('div');
+          div.className = 'rcMarkerLabel';
+          div.innerHTML = this.html;
+          this.div = div;
+          this.getPanes().overlayLayer.appendChild(div);
+        }
+        draw() {
+          const proj = this.getProjection();
+          if (!proj || !this.div) return;
+          const pos = proj.fromLatLngToDivPixel(this.position);
+          this.div.style.left = pos.x + 'px';
+          this.div.style.top = pos.y + 'px';
+        }
+        onRemove() {
+          if (this.div) { this.div.parentNode.removeChild(this.div); this.div = null; }
+        }
+      };
+    }
+
+    map = new google.maps.Map(document.getElementById('map'), {
+      center: center,
+      zoom: 12
+    });
+
+    locations.forEach(addMarkerForLocation);
+
+    map.addListener('click', (e) => {
+      if (villageCenterMode) { onVillageCenterMapTapped(e.latLng.lat(), e.latLng.lng()); return; }
+      if (pinMode) { onHouseholdMapTapped(e.latLng.lat(), e.latLng.lng()); return; }
+    });
+  }
+  setup();
+}
+
+function getChildMarkerIcon() {
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">' +
+      '<path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 28 18 28s18-14.5 18-28C36 8.06 27.94 0 18 0z" fill="#1b5e20" stroke="#ffffff" stroke-width="1.5"/>' +
+      '<circle cx="18" cy="13.5" r="5" fill="#ffffff"/>' +
+      '<path d="M10 27c0-5.5 4-9 8-9s8 3.5 8 9v1.5H10V27z" fill="#ffffff"/>' +
+    '</svg>';
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new google.maps.Size(36, 46),
+    anchor: new google.maps.Point(18, 46)
+  };
+}
+
+function addMarkerForLocation(loc) {
+  const position = { lat: parseFloat(loc.lat), lng: parseFloat(loc.lng) };
+  const marker = new google.maps.Marker({
+    position: position,
+    map: map,
+    icon: getChildMarkerIcon(),
+    title: 'Child ID: ' + loc.childId + (loc.childName ? ' - ' + loc.childName : '')
+  });
+
+  const labelHtml = '<span class="rcLabelId">' + escapeHtml(loc.childId) + '</span>' +
+    (loc.childName ? ' ' + escapeHtml(loc.childName) : '');
+  const label = new RcLabelOverlay(marker.getPosition(), labelHtml, map);
+
+  const info = new google.maps.InfoWindow({
+    content: `<div class="infoWindowContent">
+        <strong>Child ID:</strong> ${escapeHtml(loc.childId)}<br>
+        ${loc.childName ? '<strong>Name:</strong> ' + escapeHtml(loc.childName) + '<br>' : ''}
+        ${loc.notes ? '<em>' + escapeHtml(loc.notes) + '</em><br>' : ''}
+        <span style="font-size:12px;color:#666;">Pinned by ${escapeHtml(loc.pinnedBy)}</span><br>
+        <button class="dirBtn" onclick="getDirectionsHandler(${loc.lat}, ${loc.lng})">📍 Get Directions</button>
+        <button class="deletePinBtn" onclick="deleteLocationHandler('${escapeHtml(String(loc.childId)).replace(/'/g, "\\'")}', '${loc.lat}', '${loc.lng}')">🗑 Delete this pin</button>
+      </div>`
+  });
+  marker.addListener('click', () => info.open(map, marker));
+  markers.push(marker);
+  markersByChildId[String(loc.childId).trim()] = { marker, info, label };
+}
+
+// ---------- Get Directions: always starts from the CVC/officer's live GPS ----------
+function getDirectionsHandler(destLat, destLng) {
+  const destination = destLat + ',' + destLng;
+  const openMaps = (origin) => {
+    const url = 'https://www.google.com/maps/dir/?api=1'
+      + (origin ? '&origin=' + origin : '')
+      + '&destination=' + destination
+      + '&travelmode=driving';
+    window.open(url, '_blank');
+  };
+
+  if (!navigator.geolocation) {
+    alert('Your device/browser does not support GPS location. Opening directions without a fixed starting point - please set your location manually in Google Maps.');
+    openMaps(null);
+    return;
+  }
+
+  showGeocodeStatus('📍 Getting your current GPS location...', 0);
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      showGeocodeStatus('', 0);
+      document.getElementById('geocodeStatus').style.display = 'none';
+      openMaps(pos.coords.latitude + ',' + pos.coords.longitude);
+    },
+    (err) => {
+      document.getElementById('geocodeStatus').style.display = 'none';
+      let reason = 'Could not get your GPS location.';
+      if (err.code === err.PERMISSION_DENIED) {
+        reason = 'Location permission was denied. Please allow location access for this app (in your phone/browser settings) so directions can start from where you are.';
+      } else if (err.code === err.TIMEOUT) {
+        reason = 'Getting your GPS location took too long. Please make sure GPS is turned on and try again.';
+      }
+      alert(reason + '\nOpening directions without your exact starting point.');
+      openMaps(null);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+}
+
+function deleteLocationHandler(childId, lat, lng) {
+  if (!confirm('Delete the pinned location for Child ID ' + childId + '? This cannot be undone.')) return;
+  showLoading(true);
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action: 'deleteLocation', childId: childId, lat: lat, lng: lng }, authCreds))
+  })
+  .then(r => r.json())
+  .then(data => {
+    showLoading(false);
+    if (!data.ok) { alert(data.error || 'Could not delete.'); return; }
+    const entry = markersByChildId[String(childId).trim()];
+    if (entry) {
+      entry.info.close();
+      entry.marker.setMap(null);
+      if (entry.label) entry.label.setMap(null);
+      delete markersByChildId[String(childId).trim()];
+    }
+  })
+  .catch(err => { showLoading(false); alert('Network error: ' + err.message); });
+}
+
+/* =========================================================================
+   ADMIN MODE: Set Village Center
+   ========================================================================= */
+document.getElementById('toggleVillageCenterBtn').addEventListener('click', () => {
+  document.getElementById('villageCenterPanel').style.display = 'block';
+  document.getElementById('vcDistrict').value = '';
+  document.getElementById('vcCommune').innerHTML = '<option value="">-- Select District first --</option>';
+  document.getElementById('vcCommune').disabled = true;
+  document.getElementById('vcVillage').innerHTML = '<option value="">-- Select Commune first --</option>';
+  document.getElementById('vcVillage').disabled = true;
+  document.getElementById('vcTapHint').style.display = 'none';
+  document.getElementById('vcSetHint').style.display = 'none';
+  villageCenterMode = false;
+  if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
+});
+document.getElementById('closeVillageCenterBtn').addEventListener('click', closeVillageCenterPanel);
+document.getElementById('vcCancelBtn').addEventListener('click', closeVillageCenterPanel);
+function closeVillageCenterPanel() {
+  document.getElementById('villageCenterPanel').style.display = 'none';
+  villageCenterMode = false;
+  if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
+}
+
+function populateVCDistrictDropdown() {
+  const sel = document.getElementById('vcDistrict');
+  const districts = uniqueSorted(roster.map(r => r.district));
+  sel.innerHTML = '<option value="">-- Select District --</option>' +
+    districts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+}
+
+document.getElementById('vcDistrict').addEventListener('change', function() {
+  const district = this.value;
+  const communeSel = document.getElementById('vcCommune');
+  const villageSel = document.getElementById('vcVillage');
+  villageSel.innerHTML = '<option value="">-- Select Commune first --</option>';
+  villageSel.disabled = true;
+  document.getElementById('vcTapHint').style.display = 'none';
+  villageCenterMode = false;
+
+  if (!district) { communeSel.innerHTML = '<option value="">-- Select District first --</option>'; communeSel.disabled = true; return; }
+  const communes = uniqueSorted(roster.filter(r => r.district === district).map(r => r.commune));
+  communeSel.innerHTML = '<option value="">-- Select Commune --</option>' +
+    communes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  communeSel.disabled = false;
+});
+
+document.getElementById('vcCommune').addEventListener('change', function() {
+  const district = document.getElementById('vcDistrict').value;
+  const commune = this.value;
+  const villageSel = document.getElementById('vcVillage');
+  document.getElementById('vcTapHint').style.display = 'none';
+  villageCenterMode = false;
+
+  if (!commune) { villageSel.innerHTML = '<option value="">-- Select Commune first --</option>'; villageSel.disabled = true; return; }
+  const villages = uniqueSorted(roster.filter(r => r.district === district && r.commune === commune).map(r => r.village));
+  villageSel.innerHTML = '<option value="">-- Select Village --</option>' +
+    villages.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  villageSel.disabled = false;
+});
+
+document.getElementById('vcVillage').addEventListener('change', function() {
+  if (!this.value) { document.getElementById('vcTapHint').style.display = 'none'; villageCenterMode = false; return; }
+  document.getElementById('vcTapHint').style.display = 'block';
+  document.getElementById('vcSetHint').style.display = 'none';
+  villageCenterMode = true;
+  if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
+});
+
+function onVillageCenterMapTapped(lat, lng) {
+  document.getElementById('villageCenterPanel').dataset.lat = lat;
+  document.getElementById('villageCenterPanel').dataset.lng = lng;
+  if (tempMarker) tempMarker.setMap(null);
+  tempMarker = new google.maps.Marker({
+    position: { lat, lng }, map, icon: {
+      path: google.maps.SymbolPath.CIRCLE, scale: 9,
+      fillColor: '#8e24aa', fillOpacity: 1, strokeColor: 'white', strokeWeight: 2
+    }
+  });
+  document.getElementById('vcTapHint').style.display = 'none';
+  document.getElementById('vcSetHint').style.display = 'block';
+}
+
+document.getElementById('vcSaveBtn').addEventListener('click', () => {
+  const panel = document.getElementById('villageCenterPanel');
+  const district = document.getElementById('vcDistrict').value;
+  const commune = document.getElementById('vcCommune').value;
+  const village = document.getElementById('vcVillage').value;
+  if (!district || !commune || !village) { alert('Please select District, Commune, and Village.'); return; }
+  if (!panel.dataset.lat || !panel.dataset.lng) { alert('Please tap the map to set the center point first.'); return; }
+
+  showLoading(true);
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({
+      action: 'setVillageCenter',
+      district, commune, village, lat: panel.dataset.lat, lng: panel.dataset.lng
+    }, authCreds))
+  })
+  .then(r => r.json())
+  .then(data => {
+    showLoading(false);
+    if (!data.ok) { alert(data.error || 'Could not save.'); return; }
+    const key = vKey(district, commune, village);
+    const center = { district, commune, village, lat: panel.dataset.lat, lng: panel.dataset.lng };
+    villageCentersByKey[key] = center;
+    const existingIndex = villageCenters.findIndex(vc => vKey(vc.district, vc.commune, vc.village) === key);
+    if (existingIndex >= 0) villageCenters[existingIndex] = center; else villageCenters.push(center);
+    buildVillageLookups();
+    alert('Saved! Village center for "' + village + '" is set.');
+    closeVillageCenterPanel();
+  })
+  .catch(err => { showLoading(false); alert('Network error: ' + err.message); });
+});
+
+/* =========================================================================
+   CVC MODE: search a village -> map jumps there -> tap to pin household
+   ========================================================================= */
+document.getElementById('goToVillageBtn').addEventListener('click', goToSearchedVillage);
+document.getElementById('villageSearchInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') goToSearchedVillage();
+});
+
+function goToSearchedVillage() {
+  const typed = document.getElementById('villageSearchInput').value.trim();
+  const key = villageDisplayToKey[typed];
+  if (!key) {
+    alert('Please pick a village from the suggestions list (start typing and choose one).');
+    return;
+  }
+  const center = villageCentersByKey[key];
+  map.panTo({ lat: parseFloat(center.lat), lng: parseFloat(center.lng) });
+  map.setZoom(16);
+  selectedVillageForPin = { district: center.district, commune: center.commune, village: center.village };
+  pinMode = true;
+  showGeocodeStatus('📍 Now tap the map to place the pin at the RC home in ' + center.village, 5000);
+}
+
+document.getElementById('togglePinModeBtn').addEventListener('click', () => {
+  const typed = document.getElementById('villageSearchInput').value.trim();
+  if (villageDisplayToKey[typed]) {
+    goToSearchedVillage();
+  } else {
+    alert('First search and select a village above (or use "Set Village Center" if you are an Admin and this village has no center point yet), then tap the map.');
+  }
+});
+
+function onHouseholdMapTapped(lat, lng) {
+  if (!selectedVillageForPin) return;
+  const panel = document.getElementById('pinPanel');
+  panel.style.display = 'block';
+  panel.dataset.lat = lat;
+  panel.dataset.lng = lng;
+  document.getElementById('pinVillageDisplay').textContent =
+    selectedVillageForPin.village + ' - ' + selectedVillageForPin.commune + ' - ' + selectedVillageForPin.district;
+
+  if (tempMarker) tempMarker.setMap(null);
+  tempMarker = new google.maps.Marker({
+    position: { lat, lng }, map, icon: {
+      path: google.maps.SymbolPath.CIRCLE, scale: 8,
+      fillColor: '#e65100', fillOpacity: 1, strokeColor: 'white', strokeWeight: 2
+    }
+  });
+
+  const children = roster.filter(r =>
+    r.district === selectedVillageForPin.district &&
+    r.commune === selectedVillageForPin.commune &&
+    r.village === selectedVillageForPin.village);
+
+  pinChildDisplayToChild = {};
+  const childDatalist = document.getElementById('pinChildDatalist');
+  childDatalist.innerHTML = children.map(c => {
+    const display = c.childId + ' - ' + c.name;
+    pinChildDisplayToChild[display] = c;
+    return `<option value="${escapeHtml(display)}">`;
+  }).join('');
+
+  const childInput = document.getElementById('pinChildSearchInput');
+  childInput.value = '';
+  childInput.placeholder = children.length
+    ? '🔍 Type name or ID to search...'
+    : 'No children found for this village';
+
+  document.getElementById('pinNotes').value = '';
+
+  if (preSelectedChildId) {
+    const match = children.find(c => String(c.childId) === String(preSelectedChildId));
+    if (match) childInput.value = match.childId + ' - ' + match.name;
+  }
+  preSelectedChildId = null;
+
+  pinMode = false;
+}
+
+document.getElementById('closePinPanelBtn').addEventListener('click', closePinPanel);
+document.getElementById('cancelPinBtn').addEventListener('click', closePinPanel);
+function closePinPanel() {
+  document.getElementById('pinPanel').style.display = 'none';
+  pinMode = false;
+  selectedVillageForPin = null;
+  preSelectedChildId = null;
+  document.getElementById('pinChildSearchInput').value = '';
+  if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
+}
+
+document.getElementById('savePinBtn').addEventListener('click', () => {
+  const panel = document.getElementById('pinPanel');
+  const typed = document.getElementById('pinChildSearchInput').value.trim();
+  const matchedChild = pinChildDisplayToChild[typed];
+  const childId = matchedChild ? matchedChild.childId : '';
+  const childName = matchedChild ? matchedChild.name : '';
+  const notes = document.getElementById('pinNotes').value.trim();
+  if (!childId) { alert('Please type a name or ID and pick a matching suggestion from the list.'); return; }
+
+  showLoading(true);
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({
+      action: 'addLocation', childId: childId,
+      lat: panel.dataset.lat, lng: panel.dataset.lng, notes: notes
+    }, authCreds))
+  })
+  .then(r => r.json())
+  .then(data => {
+    showLoading(false);
+    if (!data.ok) { alert(data.error || 'Could not save.'); return; }
+    addMarkerForLocation({ childId, childName, lat: panel.dataset.lat, lng: panel.dataset.lng, pinnedBy: currentUser.email, notes });
+    if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
+    closePinPanel();
+  })
+  .catch(err => { showLoading(false); alert('Network error: ' + err.message); });
+});
+
+// =========================================================================
+// RC SEARCH: type letters of the name, OR just the last 4 digits of the
+// Child ID / PU code. Tap a suggestion to jump to an existing pin, or -
+// if this RC has not been pinned yet - jump straight into pin mode with
+// that child already selected, ready to tap the map.
+// =========================================================================
+const rcSearchInput = document.getElementById('rcSearchInput');
+const rcSearchResults = document.getElementById('rcSearchResults');
+
+rcSearchInput.addEventListener('input', function() {
+  renderRcSearchResults(this.value);
+});
+rcSearchInput.addEventListener('focus', function() {
+  if (this.value.trim()) renderRcSearchResults(this.value);
+});
+rcSearchInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    const first = rcSearchResults.querySelector('.rcResultItem');
+    if (first) first.click();
+  } else if (e.key === 'Escape') {
+    rcSearchResults.style.display = 'none';
+  }
+});
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('rcSearchBox').contains(e.target)) {
+    rcSearchResults.style.display = 'none';
+  }
+});
+
+function renderRcSearchResults(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) { rcSearchResults.style.display = 'none'; rcSearchResults.innerHTML = ''; return; }
+
+  // Digits typed (e.g. last 4 of the Child ID / PU code) are matched as a
+  // suffix of the ID's digits. Letters typed are matched anywhere in the name.
+  const qDigits = q.replace(/\D/g, '');
+  const matches = roster.filter(r => {
+    const idStr = String(r.childId || '').toLowerCase();
+    const nameStr = String(r.name || '').toLowerCase();
+    if (nameStr.includes(q)) return true;
+    if (idStr.includes(q)) return true;
+    if (qDigits.length >= 2) {
+      const idDigits = idStr.replace(/\D/g, '');
+      if (idDigits.endsWith(qDigits)) return true;
+    }
+    return false;
+  }).slice(0, 20);
+
+  if (!matches.length) {
+    rcSearchResults.innerHTML = '<div class="rcNoResults">No matching RC found / រកមិនឃើញ</div>';
+    rcSearchResults.style.display = 'block';
+    return;
+  }
+
+  rcSearchResults.innerHTML = matches.map(r => {
+    const isPinned = !!markersByChildId[String(r.childId).trim()];
+    return `<div class="rcResultItem" data-child-id="${escapeHtml(r.childId)}">
+        <span class="rcStatus ${isPinned ? 'pinned' : 'unpinned'}">${isPinned ? '📍 Pinned' : '➕ Not pinned'}</span>
+        <div class="rcName">${escapeHtml(r.name)}</div>
+        <div class="rcMeta">ID: ${escapeHtml(r.childId)} · ${escapeHtml(r.village)}, ${escapeHtml(r.commune)}</div>
+      </div>`;
+  }).join('');
+  rcSearchResults.style.display = 'block';
+
+  rcSearchResults.querySelectorAll('.rcResultItem').forEach(el => {
+    el.addEventListener('click', () => {
+      const childId = el.dataset.childId;
+      const r = roster.find(x => String(x.childId) === String(childId));
+      if (r) selectRcSearchResult(r);
+    });
+  });
+}
+
+function selectRcSearchResult(r) {
+  rcSearchResults.style.display = 'none';
+  rcSearchInput.value = '';
+
+  const entry = markersByChildId[String(r.childId).trim()];
+  if (entry) {
+    map.panTo(entry.marker.getPosition());
+    map.setZoom(17);
+    entry.info.open(map, entry.marker);
+    showGeocodeStatus('📍 Showing pinned location for ' + r.name, 4000);
+    return;
+  }
+
+  const key = vKey(r.district, r.commune, r.village);
+  const center = villageCentersByKey[key];
+  if (!center) {
+    alert('The village "' + r.village + '" does not have a center point set yet.\nAsk an Admin to set it first (📌 Set Village Center), or use "➕ Pin RC" and search the village manually.');
+    return;
+  }
+  map.panTo({ lat: parseFloat(center.lat), lng: parseFloat(center.lng) });
+  map.setZoom(17);
+  selectedVillageForPin = { district: r.district, commune: r.commune, village: r.village };
+  preSelectedChildId = r.childId;
+  pinMode = true;
+  showGeocodeStatus('📍 Tap the map at the RC home for ' + r.name + ' (' + r.childId + ')', 6000);
+}
+
+function showGeocodeStatus(msg, autoHideMs) {
+  const box = document.getElementById('geocodeStatus');
+  box.textContent = msg;
+  box.style.display = msg ? 'block' : 'none';
+  if (autoHideMs) {
+    clearTimeout(showGeocodeStatus._t);
+    showGeocodeStatus._t = setTimeout(() => { box.style.display = 'none'; }, autoHideMs);
+  }
+}
+
+// ---------- Sign out ----------
+document.getElementById('signOutBtn').addEventListener('click', () => {
+  if (window.google && google.accounts && google.accounts.id) {
+    google.accounts.id.disableAutoSelect();
+  }
+  location.reload();
+});
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => {
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
