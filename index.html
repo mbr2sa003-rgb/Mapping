@@ -686,12 +686,30 @@ function addMarkerForLocation(loc) {
 // ---------- Get Directions: always starts from the CVC/officer's live GPS ----------
 function getDirectionsHandler(destLat, destLng) {
   const destination = destLat + ',' + destLng;
+
+  // Open the tab immediately, synchronously, inside the tap/click itself.
+  // Some mobile browsers block window.open() if it happens after an async
+  // step (like waiting for the GPS permission prompt to resolve), because by
+  // then it no longer looks like a direct response to the user's tap. So we
+  // open a blank tab right now and fill in the real Maps URL once we have
+  // the GPS fix - this keeps it from being silently blocked or stuck stale.
+  const mapTab = window.open('about:blank', '_blank');
+  if (mapTab && mapTab.document) {
+    try {
+      mapTab.document.write('<p style="font-family:sans-serif;padding:20px;">Getting your GPS location…</p>');
+    } catch (e) { /* ignore, some browsers restrict document.write on about:blank */ }
+  }
+
   const openMaps = (origin) => {
     const url = 'https://www.google.com/maps/dir/?api=1'
       + (origin ? '&origin=' + origin : '')
       + '&destination=' + destination
       + '&travelmode=driving';
-    window.open(url, '_blank');
+    if (mapTab && !mapTab.closed) {
+      mapTab.location.href = url;
+    } else {
+      window.open(url, '_blank');
+    }
   };
 
   if (!navigator.geolocation) {
@@ -703,7 +721,6 @@ function getDirectionsHandler(destLat, destLng) {
   showGeocodeStatus('📍 Getting your current GPS location...', 0);
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      showGeocodeStatus('', 0);
       document.getElementById('geocodeStatus').style.display = 'none';
       openMaps(pos.coords.latitude + ',' + pos.coords.longitude);
     },

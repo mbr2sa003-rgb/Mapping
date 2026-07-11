@@ -4,7 +4,7 @@
 // requests - those always go to the network, since pin data must always be fresh
 // and Google's own scripts should not be cached by us.
 
-const CACHE_NAME = 'rc-map-shell-v1';
+const CACHE_NAME = 'rc-map-shell-v2';
 const APP_SHELL = [
   './index.html',
   './manifest.json',
@@ -36,18 +36,18 @@ self.addEventListener('fetch', (event) => {
   // to the network as normal, untouched.
   if (url.origin !== self.location.origin) return;
 
+  // Network-first: always try to get the latest version of the app when
+  // online (so field updates like this one show up immediately on phones),
+  // and only fall back to the cached copy if the device is offline.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networkFetch = fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached); // offline fallback to cached shell if network fails
-      return cached || networkFetch;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
